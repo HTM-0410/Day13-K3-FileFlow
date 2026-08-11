@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+_dotenv_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(str(_dotenv_path))
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -13,7 +19,7 @@ from .metrics import record_error, snapshot
 from .middleware import CorrelationIdMiddleware
 from .pii import hash_user_id, summarize_text
 from .schemas import ChatRequest, ChatResponse
-from .tracing import tracing_enabled
+from .tracing import get_langfuse_client, tracing_enabled
 
 configure_logging()
 log = get_logger()
@@ -21,7 +27,7 @@ app = FastAPI(title="Day 13 Observability Lab")
 app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
 
-DEFAULT_MODEL = os.getenv("APP_MODEL", "mock-llm-v1")
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 @app.middleware("http")
@@ -35,6 +41,8 @@ async def enrich_log_context(request: Request, call_next):
         feature=feature,
     )
     response = await call_next(request)
+    if os.getenv("LANGFUSE_FLUSH_EACH_REQUEST", "false").lower() == "true":
+        get_langfuse_client().flush()
     return response
 
 
@@ -87,6 +95,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             feature=body.feature,
             session_id=body.session_id,
             message=body.message,
+            correlation_id=request.state.correlation_id,
         )
         log.info(
             "response_sent",
@@ -100,6 +109,9 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             tokens_out=result.tokens_out,
             cost_usd=result.cost_usd,
             quality_score=result.quality_score,
+            trace_id=result.trace_id,
+            rag_latency_ms=result.rag_latency_ms,
+            llm_latency_ms=result.llm_latency_ms,
             payload={"answer_preview": summarize_text(result.answer)},
         )
         return ChatResponse(
@@ -110,6 +122,9 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             tokens_out=result.tokens_out,
             cost_usd=result.cost_usd,
             quality_score=result.quality_score,
+            trace_id=result.trace_id,
+            rag_latency_ms=result.rag_latency_ms,
+            llm_latency_ms=result.llm_latency_ms,
         )
     except Exception as exc:  # pragma: no cover
         error_type = type(exc).__name__

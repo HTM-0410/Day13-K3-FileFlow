@@ -29,6 +29,12 @@ class RecordingLangfuseClient:
     def update_current_generation(self, **kwargs) -> None:
         self.generation_updates.append(kwargs)
 
+    def update_current_span(self, **kwargs) -> None:
+        return None
+
+    def get_current_trace_id(self) -> str:
+        return "trace-test-001"
+
 
 def test_agent_links_prompt_version_to_trace_and_generation(monkeypatch) -> None:
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "test-public-key")
@@ -45,15 +51,18 @@ def test_agent_links_prompt_version_to_trace_and_generation(monkeypatch) -> None
         feature="qa",
         session_id="session-01",
         message="Explain traces",
+        correlation_id="req-test-001",
     )
 
     trace_metadata = client.trace_updates[-1]["metadata"]
     generation_update = client.generation_updates[-1]
-    assert trace_metadata == {
-        "prompt_name": "day13-chat",
-        "prompt_label": "production",
-        "prompt_version": "3",
-        "prompt_source": "langfuse",
-    }
+    assert trace_metadata["prompt_name"] == "day13-chat"
+    assert trace_metadata["prompt_label"] == "production"
+    assert trace_metadata["prompt_version"] == "3"
+    assert trace_metadata["prompt_source"] == "langfuse"
+    assert trace_metadata["correlation_id"] == "req-test-001"
+    assert trace_metadata["rag_latency_ms"] >= 0
+    assert trace_metadata["llm_latency_ms"] >= 100
     assert generation_update["prompt"] is client.prompt
     assert generation_update["metadata"]["prompt_version"] == "3"
+    assert generation_update["metadata"]["component"] == "llm"

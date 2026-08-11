@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
+
+# Load .env if exists
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(_env_path)
 
 try:
     from langfuse import get_client, observe
@@ -21,6 +28,12 @@ except ImportError:  # pragma: no cover - chỉ dùng khi chưa cài requirement
             return None
 
         def update_current_generation(self, **kwargs: Any) -> None:
+            return None
+
+        def update_current_span(self, **kwargs: Any) -> None:
+            return None
+
+        def get_current_trace_id(self) -> str | None:
             return None
 
     def get_client():
