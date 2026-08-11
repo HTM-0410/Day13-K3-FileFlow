@@ -1,83 +1,125 @@
+service: day13-observability-lab
+window: 28d
+
 dashboard:
   schema_version: 1
-  title: Day 13 AI Observability
   time_range_minutes: 60
-  refresh_seconds: 30
+  refresh_seconds: 20
+  description: "Day 13 AI Observability Dashboard - 6 SLO panels"
+
   panels:
     - id: latency
-      title: Latency percentiles
+      title: "⏱️ Latency Percentiles"
       source: data/logs.jsonl
-      events: [response_sent]
-      fields: [latency_ms]
-      aggregations: [p50, p95, p99]
-      query: 'event == "response_sent" | percentile(latency_ms, [50, 95, 99])'
+      events:
+        - response_sent
+      fields:
+        - latency_ms
+      aggregations:
+        - p50
+        - p95
+        - p99
+        - median
+      query: "event=response_sent"
       unit: ms
       threshold:
         aggregation: p95
         operator: lte
         value: 3000
+        slo_target: 99.5
 
     - id: traffic
-      title: Request traffic
+      title: "📬 Request Traffic"
       source: data/logs.jsonl
-      events: [request_received]
-      fields: [event]
-      aggregations: [count, rate_per_minute]
-      query: 'event == "request_received" | count() by 1m'
-      unit: requests_per_minute
+      events:
+        - request_received
+      fields:
+        - event
+      aggregations:
+        - count
+        - rate_per_min
+      query: "event=request_received"
+      unit: req/min
       threshold:
-        aggregation: rate_per_minute
+        aggregation: count
         operator: gte
         value: 1
+        slo_target: 99.0
 
     - id: errors
-      title: Error rate and breakdown
+      title: "🚨 Error Rate"
       source: data/logs.jsonl
-      events: [request_received, request_failed]
-      fields: [error_type]
-      aggregations: [error_rate_pct, count_by_value]
-      query: 'count(event == "request_failed") / count(event == "request_received") * 100; count_by(error_type)'
-      unit: percent
+      events:
+        - request_failed
+        - request_received
+      fields:
+        - event
+        - error_type
+      aggregations:
+        - count
+        - error_rate_pct
+      query: "event=request_failed"
+      unit: "%"
       threshold:
         aggregation: error_rate_pct
         operator: lte
-        value: 2
+        value: 2.0
+        slo_target: 99.0
 
     - id: cost
-      title: Cost over time
+      title: "💰 Cost Over Time"
       source: data/logs.jsonl
-      events: [response_sent]
-      fields: [cost_usd]
-      aggregations: [sum_by_minute, total]
-      query: 'event == "response_sent" | sum(cost_usd) by 1m; sum(cost_usd)'
-      unit: usd
+      events:
+        - response_sent
+      fields:
+        - cost_usd
+      aggregations:
+        - sum
+        - avg
+        - total
+      query: "event=response_sent"
+      unit: USD
       threshold:
-        aggregation: total
+        aggregation: sum
         operator: lte
         value: 2.5
+        slo_target: 100.0
 
     - id: tokens
-      title: Input and output tokens
+      title: "🔢 Input & Output Tokens"
       source: data/logs.jsonl
-      events: [response_sent]
-      fields: [tokens_in, tokens_out]
-      aggregations: [sum_by_field]
-      query: 'event == "response_sent" | sum(tokens_in), sum(tokens_out)'
+      events:
+        - response_sent
+      fields:
+        - tokens_in
+        - tokens_out
+      aggregations:
+        - sum
+        - avg
+      query: "event=response_sent"
       unit: tokens
       threshold:
-        aggregation: sum_by_field
+        aggregation: sum
         operator: lte
         value: 50000
+        slo_target: 95.0
 
     - id: quality
-      title: Quality proxy
+      title: "⭐ Quality Proxy Score"
       source: data/logs.jsonl
-      events: [response_sent]
-      fields: [quality_score]
-      aggregations: [mean]
-      query: 'event == "response_sent" | mean(quality_score)'
-      unit: score_0_to_1
+      events:
+        - response_sent
+      fields:
+        - quality_score
+      aggregations:
+        - mean
+        - min
+        - max
+        - avg
+      query: "event=response_sent"
+      unit: score
       threshold:
         aggregation: mean
         operator: gte
         value: 0.75
+        slo_target: 95.0

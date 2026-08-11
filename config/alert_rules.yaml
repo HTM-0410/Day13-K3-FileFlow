@@ -1,19 +1,60 @@
 alerts:
-  - name: TODO_alert_1
-    severity: TODO
-    condition: TODO
+  - name: LatencyP95Breach
+    severity: warning
+    condition: "p95 latency > 3000ms trong 5 phút liên tiếp"
     type: symptom-based
-    owner: TODO
-    runbook: docs/alerts.md#alert-1
-  - name: TODO_alert_2
-    severity: TODO
-    condition: TODO
+    owner: backend-team
+    sli: latency_p95_ms
+    threshold_ms: 3000
+    window_minutes: 5
+    runbook: docs/alerts.md#latency-p95-breach
+
+  - name: HighErrorRate
+    severity: critical
+    condition: "error rate > 2% trong 2 phút liên tiếp"
     type: symptom-based
-    owner: TODO
-    runbook: docs/alerts.md#alert-2
-  - name: TODO_alert_3
-    severity: TODO
-    condition: TODO
+    owner: backend-team
+    sli: error_rate_pct
+    threshold_pct: 2.0
+    window_minutes: 2
+    runbook: docs/alerts.md#high-error-rate
+
+  - name: CostSpike
+    severity: warning
+    condition: "daily cost > $2.5"
     type: symptom-based
-    owner: TODO
-    runbook: docs/alerts.md#alert-3
+    owner: platform-team
+    sli: daily_cost_usd
+    threshold_usd: 2.5
+    window_minutes: 1440
+    runbook: docs/alerts.md#cost-spike
+
+  - name: LowQualityScore
+    severity: warning
+    condition: "mean quality score < 0.75 trong 10 phút liên tiếp"
+    type: symptom-based
+    owner: ai-team
+    sli: quality_score_avg
+    threshold_score: 0.75
+    window_minutes: 10
+    runbook: docs/alerts.md#low-quality-score
+
+  - name: NoTraffic
+    severity: warning
+    condition: "0 requests trong 5 phút liên tiếp"
+    type: symptom-based
+    owner: platform-team
+    sli: traffic
+    threshold_rpm: 1
+    window_minutes: 5
+    runbook: docs/alerts.md#no-traffic
+
+  - name: RagRetrievalSlow
+    severity: warning
+    condition: "rag retrieval > 2000ms trong 3 request liên tiếp"
+    type: cause-based
+    owner: backend-team
+    sli: rag_latency_ms
+    threshold_ms: 2000
+    consecutive_requests: 3
+    runbook: docs/alerts.md#rag-retrieval-slow
