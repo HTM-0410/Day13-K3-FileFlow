@@ -4,7 +4,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from structlog.contextvars import bind_contextvars
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from .agent import LabAgent
 from .incidents import disable, enable, status
@@ -20,6 +20,22 @@ log = get_logger()
 app = FastAPI(title="Day 13 Observability Lab")
 app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
+
+DEFAULT_MODEL = os.getenv("APP_MODEL", "mock-llm-v1")
+
+
+@app.middleware("http")
+async def enrich_log_context(request: Request, call_next):
+    env = os.getenv("APP_ENV", "dev")
+    model = os.getenv("APP_MODEL", DEFAULT_MODEL)
+    feature = request.headers.get("x-feature") or "default"
+    bind_contextvars(
+        env=env,
+        model=model,
+        feature=feature,
+    )
+    response = await call_next(request)
+    return response
 
 
 @app.on_event("startup")
@@ -44,12 +60,25 @@ async def metrics() -> dict:
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
-    # TODO: Enrich logs with request context (user_id_hash, session_id, feature, model, env)
-    # bind_contextvars(...)
-    
+    user_id_hash = hash_user_id(body.user_id)
+    session_id = body.session_id
+    feature = body.feature or "default"
+    model = os.getenv("APP_MODEL", DEFAULT_MODEL)
+
+    bind_contextvars(
+        user_id_hash=user_id_hash,
+        session_id=session_id,
+        feature=feature,
+        model=model,
+    )
+
     log.info(
         "request_received",
         service="api",
+        user_id_hash=user_id_hash,
+        session_id=session_id,
+        feature=feature,
+        model=model,
         payload={"message_preview": summarize_text(body.message)},
     )
     try:
@@ -62,6 +91,10 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         log.info(
             "response_sent",
             service="api",
+            user_id_hash=user_id_hash,
+            session_id=session_id,
+            feature=feature,
+            model=model,
             latency_ms=result.latency_ms,
             tokens_in=result.tokens_in,
             tokens_out=result.tokens_out,
@@ -84,6 +117,10 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         log.error(
             "request_failed",
             service="api",
+            user_id_hash=user_id_hash,
+            session_id=session_id,
+            feature=feature,
+            model=model,
             error_type=error_type,
             payload={"detail": str(exc), "message_preview": summarize_text(body.message)},
         )

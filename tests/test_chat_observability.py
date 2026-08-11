@@ -30,3 +30,6 @@ def test_chat_response_log_exposes_quality_for_dashboard(
     events = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
     response_event = next(event for event in events if event["event"] == "response_sent")
     assert response_event["quality_score"] == response.json()["quality_score"]
+    assert response_event["rag_latency_ms"] == response.json()["rag_latency_ms"]
+    assert response_event["llm_latency_ms"] == response.json()["llm_latency_ms"]
+    assert response_event["llm_latency_ms"] >= 100
